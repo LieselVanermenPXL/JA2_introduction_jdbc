@@ -47,7 +47,7 @@ public class MusicDatasource {
 	public static final String QUERY_SONG_INFO = "SELECT ar.name, al.name, s.track, s.title FROM albums al\n" +
 			"  INNER JOIN artists ar ON ar._id = al.artist\n" +
 			"  INNER JOIN songs s ON al._id = s.album\n" +
-			"WHERE s.title = '";
+			"WHERE s.title = ?";     // aangepast: ? betekent dat gebruiker hier iets voor moet meegeven
 
 	public static final String INSERT_ARTIST = "INSERT INTO " + TABLE_ARTISTS +
 			'(' + COLUMN_ARTIST_NAME + ") VALUES(?)";
@@ -65,7 +65,7 @@ public class MusicDatasource {
 			TABLE_ALBUMS + " WHERE " + COLUMN_ALBUM_NAME + " = ?";
 
 	private Connection conn;
-	//private PreparedStatement querySongInfo;
+	private PreparedStatement querySongInfo;
 	private PreparedStatement insertIntoArtists;
 	private PreparedStatement insertIntoAlbums;
 	private PreparedStatement insertIntoSongs;
@@ -76,7 +76,7 @@ public class MusicDatasource {
 	public boolean open() {
 		try {
 			conn = DriverManager.getConnection(CONNECTION_STRING, USER_NAME, USER_PASSWORD);
-			//querySongInfo = conn.prepareStatement(QUERY_SONG_INFO);
+			querySongInfo = conn.prepareStatement(QUERY_SONG_INFO);
 			insertIntoArtists = conn.prepareStatement(INSERT_ARTIST, Statement.RETURN_GENERATED_KEYS);
 			insertIntoAlbums = conn.prepareStatement(INSERT_ALBUMS, Statement.RETURN_GENERATED_KEYS);
 			insertIntoSongs = conn.prepareStatement(INSERT_SONGS);
@@ -91,9 +91,10 @@ public class MusicDatasource {
 
 	public void close() {
 		try {
-			//	if (querySongInfo != null) {
-			//		querySongInfo.close();
-			//	}
+			if (querySongInfo != null) {
+				querySongInfo.close();
+			}
+
 			if (insertIntoArtists != null) {
 				insertIntoArtists.close();
 			}
@@ -193,11 +194,9 @@ public class MusicDatasource {
 
 	public List<SongArtist> querySongInfo(String title) {
 
-		StringBuilder sb = new StringBuilder(QUERY_SONG_INFO);
-		sb.append(title);
-		sb.append("'");
-		try (Statement statement = conn.createStatement();
-		     ResultSet results = statement.executeQuery(sb.toString())) {
+		try {
+			querySongInfo.setString(1, title) ;
+			ResultSet results = querySongInfo.executeQuery();
 
 			List<SongArtist> songArtists = new ArrayList<>();
 			while (results.next()) {
@@ -268,7 +267,8 @@ public class MusicDatasource {
 	public void insertSong(String title, String artist, String album, int track) {
 
 		try {
-			conn.setAutoCommit(false);
+			conn.setAutoCommit(false);   // transaction starten,
+			// op false zetten zodat niet het programma, maar programmeur zelf kan beslissen wanneer gecommit wordt
 
 			int artistId = insertArtist(artist);
 			int albumId = insertAlbum(album, artistId);
